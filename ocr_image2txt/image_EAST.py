@@ -4,52 +4,48 @@ import numpy as np
 from imutils.object_detection import non_max_suppression
 
 
-def image_EAST(imagepath, _width=1280, _height=640, _confidence=0.8):
+def image_EAST(imagepath,_net=None , _width=1280, _height=640, _confidence=0.8, isdbug=False):
     # 加载输入图像并获取图像尺寸
-    image = cv2.imread(imagepath)
-    (H, W) = image.shape[:2]
+    # image = cv2.imread(imagepath)
 
-    # 模型路径
-    modelpath = "frozen_east_text_detection.pb"
-    # 输入网络的图片尺寸（必须为8的倍数）
-    # size_list = [160, 320, 640, 960, 1280]
+    if _net == None:
+        # 模型路径
+        modelpath = "frozen_east_text_detection.pb"
+        # 加载预训练的 EAST 文本检测器
+        print("[image_EAST] loading EAST text detector...")
+        net = cv2.dnn.readNet(modelpath)
+    else:
+        net = _net
+
+    image = imagepath
+    orig = image.copy()
+    # 输入网络的图片尺寸（必须为32的倍数）
     width = _width
     height = _height
-
-    # 最小置信度
-    min_confidence = _confidence
-
     # 设置新的宽度和高度
     (newW, newH) = (width, height)
     # 记录原图像大小与缩小后的比值，得到预测结果后需要乘上这个缩放因子
+    (H, W) = image.shape[:2]
     rW = W / float(newW)
     rH = H / float(newH)
-
     # 调整图像大小并获取新的图像尺寸
     image = cv2.resize(image, (newW, newH))
     (H, W) = image.shape[:2]
-
+    start = time.time()
+    # 从图像中构建一个 blob，然后执行模型的前向传播以获得两个输出层集合
+    blob = cv2.dnn.blobFromImage(image, 1.0, (W, H),
+                                 (123.68, 116.78, 103.94), swapRB=True, crop=False)
+    net.setInput(blob)
     # 定义EAST检测器模型的两个输出层名称
     # 第一个是输出概率,置信度
     # 第二个可用于导出文本的边界框坐标
     layerNames = [
         "feature_fusion/Conv_7/Sigmoid",
         "feature_fusion/concat_3"]
-
-    # 加载预训练的 EAST 文本检测器
-    print("[INFO] loading EAST text detector...")
-    net = cv2.dnn.readNet(modelpath)
-
-    # 从图像中构建一个 blob，然后执行模型的前向传播以获得两个输出层集合
-    blob = cv2.dnn.blobFromImage(image, 1.0, (W, H),
-                                 (123.68, 116.78, 103.94), swapRB=True, crop=False)
-    start = time.time()
-    net.setInput(blob)
     (scores, geometry) = net.forward(layerNames)
     end = time.time()
 
     # show timing information on text prediction
-    print("[INFO] text detection took {:.6f} seconds".format(end - start))
 
     # grab the number of rows and columns from the scores volume, then
     # initialize our set of bounding box rectangles and corresponding
@@ -73,7 +69,7 @@ def image_EAST(imagepath, _width=1280, _height=640, _confidence=0.8):
         # loop over the number of columns
         for x in range(0, numCols):
             # if our score does not have sufficient probability, ignore it
-            if scoresData[x] < min_confidence:
+            if scoresData[x] < _confidence:    # 最小置信度
                 continue
 
             # compute the offset factor as our resulting feature maps will
@@ -106,6 +102,25 @@ def image_EAST(imagepath, _width=1280, _height=640, _confidence=0.8):
     # apply non-maxima suppression to suppress weak, overlapping bounding
     # boxes
     boxes = non_max_suppression(np.array(rects), probs=confidences)
+
+    if isdbug:
+        print("[image_EAST] text detection took {:.6f} seconds".format(end - start))
+        # loop over the bounding boxes
+        for (startX, startY, endX, endY) in boxes:
+            # scale the bounding box coordinates based on the respective
+            # ratios
+            startX = int(startX * rW)
+            startY = int(startY * rH)
+            endX = int(endX * rW)
+            endY = int(endY * rH)
+
+            # draw the bounding box on the image
+            cv2.rectangle(orig, (startX, startY), (endX, endY), (0, 0, 255), 2)
+
+        # show the output image
+        cv2.imshow("Text Detection", orig)
+        cv2.waitKey(0)
+
     return boxes,rW,rH
 
 

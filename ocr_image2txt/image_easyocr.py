@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np  # 导入 numpy 库1.23.0
 
 # return 扫描结果，为三元组数组(bbox, text, prob) in result
-def image_easyocr(image_path):
+def image_easyocr(image_path, isdbug=False):
     # 创建 easyocr Reader 对象
     reader = easyocr.Reader(['ch_sim'], gpu=True)  # 只识别英文，如果需要识别其他语言，可以传入 ['en', 'ch', 'fr'] 等
     start_time = time.time()
@@ -15,6 +15,24 @@ def image_easyocr(image_path):
     # 计算执行时间
     execution_time = end_time - start_time
     print(f"Function execution time: {execution_time} seconds")
+
+    if isdbug:
+        # 绘制图像并标出文本位置
+        for (bbox, text, prob) in result:
+            # bbox 是一个四点坐标，标出文本位置
+            top_left, top_right, bottom_right, bottom_left = bbox
+            top_left = tuple(map(int, top_left))
+            bottom_right = tuple(map(int, bottom_right))
+            # 画出矩形框
+            cv2.rectangle(image_path, top_left, bottom_right, (0, 255, 0), 2)
+
+        # 显示图片
+        plt.imshow(cv2.cvtColor(image_path, cv2.COLOR_BGR2RGB))
+        plt.axis('off')
+        plt.show()
+    return result
+
+
     return result
 
 # debug图片检测，结果显示框图
