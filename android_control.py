@@ -212,13 +212,14 @@ class AndroidControl():
                 get_away = [0, self.h_value1]  # 点击边界点，逃离无法选中的目标
                 self.comfunc.click(get_away)
                 self.comfunc.input_keyevent(62)  # 空格，跳跃
+                time.sleep(3)
                 TO_SELECT_TIMES = 0
 
         elif self.pre_state == ON_SELECT:
             # 拾取物品
             print("当前状态：拾取物品")
             self.pre_state = NO_SELECT
-            for i in range(3):
+            for i in range(4):
                 self.comfunc.click([460,520])
                 time.sleep(0.5)
 
