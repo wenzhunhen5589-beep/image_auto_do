@@ -55,15 +55,17 @@ class AndroidControl():
         self.ocr = None
         self.init_model()
 
-        # self.init_range()
+        # main主界面裁剪区域
         self.center = None
         self.h_value1 = 130
         self.h_value2 = 70
 
+        # 选择目标裁剪区域
         self.select_value1 = 585
         self.select_value2 = 50
         self.select_value3 = 380
 
+        # 点击图标坐标
         self.w_key = 220
         self.h_key = 520
 
@@ -187,23 +189,30 @@ class AndroidControl():
     # 截屏 --- 目标已选中 --- 攻击             5s
     #         目标未选中 --- 扫描选目标        5s
     def attack(self):
+        global TO_SELECT_TIMES  # 声明 counter 为全局变量
         start_time = time.time()
         main_image, is_select_image = self.init_range()
-        print("已截屏")
+        # print("已截屏")
         if self.is_select(is_select_image):
             print("当前状态：目标已选中")
             self.pre_state = ON_SELECT
-            # self.comfunc.input_keyevent(8)  # 按键1
             target = [self.w_key, self.h_key]
             self.comfunc.click(target) #点击技能图标
             time.sleep(0.5)
             target = [285, self.h_key]
             self.comfunc.click(target)  # 点击空白
+            TO_SELECT_TIMES = 0
 
         elif self.pre_state == TO_SELECT:
             print("当前状态：目标未选中成功")
             self.pre_state = NO_SELECT
             self.comfunc.input_keyevent(47) #s 键，停止移动
+            if TO_SELECT_TIMES > 5:
+                print("当前状态：目标多次未选中，逃离当前位置")
+                get_away = [0, self.h_value1]  # 点击边界点，逃离无法选中的目标
+                self.comfunc.click(get_away)
+                self.comfunc.input_keyevent(62)  # 空格，跳跃
+                TO_SELECT_TIMES = 0
 
         elif self.pre_state == ON_SELECT:
             # 拾取物品
@@ -214,12 +223,10 @@ class AndroidControl():
                 time.sleep(0.5)
 
         elif self.pre_state == NO_SELECT:
-            global TO_SELECT_TIMES  # 声明 counter 为全局变量
             tmp_list, offset = self.extract_boxes(main_image)  # 扫描主界面，是否存在目标
             if len(tmp_list) == 0:
                 print("当前状态：未扫描到目标,转移视角")
                 self.pre_state = NO_SELECT
-                # adb_long_press('21', duration=3)  # 长按3秒返回键
                 start = [480,270]
                 end = [720,270]
                 self.comfunc.swipe(start, end)
@@ -227,11 +234,6 @@ class AndroidControl():
                 print("当前状态：点击目标，攻击目标")
                 self.pre_state = TO_SELECT
                 TO_SELECT_TIMES += 1
-                if TO_SELECT_TIMES > 5:
-                    get_away = [0,0] #点击边界点，逃离无法选中的目标
-                    self.comfunc.click(get_away)
-                    self.comfunc.input_keyevent(62) #空格，跳跃
-                    TO_SELECT_TIMES = 0
                 target = self.order_result(tmp_list, offset)
                 self.comfunc.click(target)
 
@@ -241,7 +243,6 @@ class AndroidControl():
                 # print(f"Attack Function execution time: {execution_time} seconds")
 
 if __name__ == '__main__':
-    # adb_long_press('21', duration=3)  # 长按3秒返回键
     test = AndroidControl("emulator-5554")
 
     while True:
