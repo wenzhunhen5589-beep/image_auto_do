@@ -9,8 +9,9 @@ def crop_image(image, box):
 # 图片预处理，输入图片路径，输出
 def preprocess_image(img_path):
     # 1.打开图片
-    image_path = img_path
-    image = Image.open(image_path)
+    # image_path = img_path
+    # image = Image.open(image_path)
+    image = img_path
     # 获取图片的尺寸
     width, height = image.size
 
