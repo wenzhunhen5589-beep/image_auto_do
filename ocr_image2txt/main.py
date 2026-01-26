@@ -24,12 +24,12 @@ if __name__ == '__main__':
     #     print(endX)
     #     print(endY)
 
-    result = image_to_paddleocr_det(image,isdbug=True)
-    for (startX, startY, endX, endY) in result:
-        print(startX)
-        print(startY)
-        print(endX)
-        print(endY)
+    # result = image_to_paddleocr_det(image,isdbug=True)
+    # for (startX, startY, endX, endY) in result:
+    #     print(startX)
+    #     print(startY)
+    #     print(endX)
+    #     print(endY)
 
     # EAST模型
     # 0.601391 seconds，识别整张图片，速度很快，准确率较高，需要调整输入参数，参数影响很大，不识别文字

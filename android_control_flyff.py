@@ -6,7 +6,7 @@ import cv2
 import numpy as np  # 导入 numpy 库
 from PIL import Image
 from paddleocr import PaddleOCR
-from android_comfunc import AndroidComfuc
+from platform_func.android_comfunc import AndroidComfuc
 # from ocr_image2txt.image_easyocr import image_easyocr
 from ocr_image2txt.image_EAST import image_EAST
 from ocr_image2txt.image_paddleocr import image_to_paddleocr_det
