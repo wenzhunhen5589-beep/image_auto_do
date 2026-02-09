@@ -2,14 +2,19 @@ import math
 import os.path
 import time
 import cv2
-import numpy as np  # 导入 numpy 库
+import threading
+import numpy as np
 from PIL import Image
 from paddleocr import PaddleOCR
 from platform_func.android_comfunc import AndroidComfuc
+from platform_func.windows_control import WindowCapture
 # from ocr_image2txt.image_easyocr import image_easyocr
-from ocr_image2txt.image_EAST import image_EAST
-from ocr_image2txt.image_paddleocr import image_to_paddleocr_det, image_to_paddleocr_rec
+from image2txt_ocr.image_EAST import image_EAST
+from image2txt_ocr.image_paddleocr import image_to_paddleocr_det, image_to_paddleocr_rec
 
+# ^.*?->
+# ^
+# $
 
 # 处理 bounding box 和缩放坐标的逻辑
 def process_boxes(boxes, rW, rH, tmp_list):
@@ -38,11 +43,12 @@ def calculate_center(coordinate):
     return center
 
 
-class AndroidControl():
+class AndroidControl:
     # adb命令输入封装
     def __init__(self, sn):
         self.image = (os.path.join(os.path.dirname(__file__), "screenshot.png"))
         self.comfunc = AndroidComfuc(sn, self.image)
+        self.wincap = WindowCapture("雷电模拟器")
 
         # Ocr检测模型加载
         self.net = None
@@ -54,43 +60,61 @@ class AndroidControl():
         self.search_coordinates_value1 = 200
         self.search_coordinates_value2 = 370
         self.search_coordinates_value3 = 25
-
         # 选择目标裁剪区域
         self.trooplist_value1 = 875
         self.trooplist_value2 = 100
         self.trooplist_value3 = 955
         self.trooplist_value4 = 320
+        self.init_range()
+
 
     # 初始化ocr算法检测模型
     def init_model(self):
         print("loading text detector...")
         # 模型路径
-        model_path = (os.path.join(os.path.dirname(__file__), "ocr_image2txt\\frozen_east_text_detection.pb"))
+        model_path = (os.path.join(os.path.dirname(__file__), "image2txt_ocr\\frozen_east_text_detection.pb"))
         # 加载预训练的 EAST 文本检测器
         self.net = cv2.dnn.readNet(model_path)
         self.ocr = PaddleOCR(lang='ch')
 
+
+    def screen_capture(self):
+        return self.wincap.screenshot_DC()
+
+
     # 自定义裁剪范围区域，每个区域检测的含义不同
     def init_range(self):
-        self.comfunc.screenshot()
-        image = Image.open(self.image)
-        width, height = image.size
+        image = self.screen_capture()
+
+        # self.comfunc.screenshot()
+        # image = Image.open(self.image)
+        # width, height = image.size
+
+        # 获取图像大小
+        height, width, channels = image.shape
+        print(f"Image size: {width}x{height}")
+        # 转换为 RGB 格式
+        image_rgb = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        # 转换为 PIL Image 对象
+        plt = Image.fromarray(image_rgb)
+
         self.center = [width // 2, height // 2]
 
         search_box = (
         self.search_coordinates_value1, 0, self.search_coordinates_value2, self.search_coordinates_value3)  # 搜索栏
-        search_image = image.crop(search_box)
+        search_image = plt.crop(search_box)
 
         troop_list_box = (
         self.trooplist_value1, self.trooplist_value2, self.trooplist_value3, self.trooplist_value4)  # 队列信息
-        troop_list_image = image.crop(troop_list_box)
+        troop_list_image = plt.crop(troop_list_box)
 
         return image, search_image, troop_list_image
+
 
     # 判断队列是否已满
     def troop_list(self, troop_list_image=None):
         if troop_list_image == None:
-            main_image, troop_list_image = self.init_range()
+            image, search_image, troop_list_image = self.init_range()
         result = self.image2ocr(troop_list_image, "PaddleOCR")
         if result == None:
             return False
@@ -99,14 +123,20 @@ class AndroidControl():
         else:
             return True
 
+
     # ocr图片文字检测
     def image2ocr(self, image, type_ocr="EAST"):
-        width, height = image.size
         # 转换为 NumPy 数组
         image_np = np.array(image)
-        # 确保图像为 3 通道（BGR）
-        if image_np.shape[2] == 4:  # 如果是 RGBA 则转换为 BGR
+
+        if image_np.shape[2] == 4:  # 如果是 RGBA 格式
             image = cv2.cvtColor(image_np, cv2.COLOR_RGBA2BGR)
+        else:
+            # 这里可以选择直接转换为 BGR，如果是 RGB 则用 COLOR_RGB2BGR
+            if image_np.shape[2] == 3:  # 如果是 RGB 格式
+                image = cv2.cvtColor(image_np, cv2.COLOR_RGB2BGR)
+
+        height, width, channels = image.shape
 
         if type_ocr == "EAST":
             # EAST模型
@@ -137,7 +167,8 @@ class AndroidControl():
             result = image_to_paddleocr_rec(image, _ocr=self.ocr, isdbug=False)
             return result
 
-    def detect(self, i):
+
+    def swipe_screen(self, i):
         end_up = [self.center[0], self.center[1]*2]
         end_down = [self.center[0], 102]
         end_left = [self.center[0]*2, self.center[1]]
@@ -171,8 +202,34 @@ class AndroidControl():
                 self.comfunc.swipe(self.center, end_left)
                 time.sleep(3)
 
+
+    def move_scene(self):
+        def return_origin():
+            # 坐标回源点
+
+            # 缩放图像
+            self.comfunc.resized()
+
+        return_origin()
+        # 截图检测，滑动屏幕，再截图检测，返回检测到的坐标
+        for i in range(1, 1000):
+            self.swipe_screen(i)
+
+
+    def detect_gem(self):
+        # 拿到坐标,点击坐标,识别坐标,点击运作
+
+        for i in range(1, 1000):
+            self.swipe_screen(i)
+
+
+
     # http://kvkbvrcwzyunwffannbe.supabase.co/storage/v1/object/public/chrome
     def Gem_digging(self):
+        # 为每个客户端创建一个线程来处理连接
+        # thread_handler = threading.Thread(target=self.detect, args=(self,1000))
+        # thread_handler.start()
+
         # 坐标回源点
 
         # -----------------循环动作------------------
@@ -182,8 +239,8 @@ class AndroidControl():
         # 缩放图像
         self.comfunc.resized()
         # 截图检测，滑动屏幕，再截图检测，返回检测到的坐标
-        time.sleep(1)
-        # self.detect()
+        for i in range(1, 1000):
+            self.detect(i)
         # 拿到坐标,点击坐标,识别坐标,点击运作
 
         # -------------------------------------
@@ -191,13 +248,11 @@ class AndroidControl():
 
 if __name__ == '__main__':
     test = AndroidControl("emulator-5554")
-    # test.Gem_digging()
     test.init_range()
+    test.move_scene()
+    # test.init_range()
     # print(test.center)
     # test.detect(10)
 
-    for i in range(1, 1000):
-        test.detect(i)
-# ^.*?->
-# ^
-# $
+    # for i in range(1, 1000):
+    #     test.detect(i)
